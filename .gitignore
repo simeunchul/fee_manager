@@ -1,0 +1,35 @@
+# Credentials (never commit)
+credentials/*.json
+credentials/*.pickle
+credentials/token*
+
+# Local data (회원 개인정보 보호)
+data/*.csv
+data/*.parquet
+data/*.xlsx
+data/*.xls
+data/*.json
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

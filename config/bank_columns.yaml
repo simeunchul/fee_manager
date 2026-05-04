@@ -1,0 +1,102 @@
+# 은행별 거래내역 엑셀 컬럼 매핑
+#
+# 은행이 다운로드해주는 .xls/.xlsx 파일은 표 헤더가 은행마다 다릅니다.
+# 이 파일에서 "내부 표준 컬럼명" → "은행 파일의 실제 컬럼명 후보" 를 정의합니다.
+#
+# 새 은행 추가:
+#   1) 아래에 은행 키 추가 (예: keb, ibk)
+#   2) 해당 은행의 컬럼명을 candidates 에 나열 (다중 후보 가능)
+#   3) UI > 거래내역 업로드에서 "은행 자동 감지" 가 실패하면 수동 선택
+#
+# auto_detect_keywords:
+#   파일 안 어딘가에 이 키워드 중 하나라도 포함되면 해당 은행으로 추정
+#   (시트명/첫 행 텍스트 등에서 검색)
+
+banks:
+  kb:
+    display_name: KB국민
+    auto_detect_keywords: ["KB국민", "국민은행", "KB Star"]
+    columns:
+      txn_at: ["거래일시", "거래일자", "일시", "거래일", "거래시각"]
+      counterparty: ["보낸분/받는분", "거래처", "받는분/보낸분", "상대계좌예금주", "거래상대"]
+      deposit: ["입금액", "입금금액", "입금"]
+      withdraw: ["출금액", "출금금액", "출금"]
+      balance: ["거래후잔액", "잔액", "거래잔액"]
+      memo: ["적요", "거래메모", "내용"]
+
+  shinhan:
+    display_name: 신한
+    auto_detect_keywords: ["신한", "Shinhan"]
+    columns:
+      txn_at: ["거래일시", "거래일자", "일시", "거래일"]
+      counterparty: ["거래내용", "받는분/보낸분", "상대방", "거래처"]
+      deposit: ["입금", "입금액"]
+      withdraw: ["출금", "출금액"]
+      balance: ["잔액", "거래후잔액"]
+      memo: ["적요", "메모", "내용"]
+
+  woori:
+    display_name: 우리
+    auto_detect_keywords: ["우리은행", "WOORI"]
+    columns:
+      txn_at: ["거래일시", "거래일자", "거래일"]
+      counterparty: ["거래처", "받는분/보낸분", "상대"]
+      deposit: ["입금", "입금금액"]
+      withdraw: ["출금", "출금금액"]
+      balance: ["거래후잔액", "잔액"]
+      memo: ["적요", "내용", "메모"]
+
+  hana:
+    display_name: 하나
+    auto_detect_keywords: ["하나은행", "KEB", "Hana"]
+    columns:
+      txn_at: ["거래일시", "거래일자", "거래일", "일시"]
+      counterparty: ["거래처", "받는분/보낸분", "상대"]
+      deposit: ["입금액", "입금"]
+      withdraw: ["출금액", "출금"]
+      balance: ["거래후잔액", "잔액"]
+      memo: ["적요", "내용"]
+
+  nh:
+    display_name: 농협
+    auto_detect_keywords: ["농협", "NH"]
+    columns:
+      txn_at: ["거래일자", "거래일시", "거래일"]
+      counterparty: ["거래기록사항", "받는분/보낸분", "상대"]
+      deposit: ["입금금액", "입금"]
+      withdraw: ["출금금액", "출금"]
+      balance: ["거래후잔액", "잔액"]
+      memo: ["적요", "거래메모"]
+
+  kakaobank:
+    display_name: 카카오뱅크
+    auto_detect_keywords: ["카카오뱅크", "Kakao Bank"]
+    columns:
+      txn_at: ["거래일시", "거래일자"]
+      counterparty: ["거래상대", "받는분/보낸분", "보낸사람"]
+      deposit: ["입금", "입금액"]
+      withdraw: ["출금", "출금액"]
+      balance: ["잔액", "거래후잔액"]
+      memo: ["적요", "거래내용", "메모"]
+
+  toss:
+    display_name: 토스뱅크
+    auto_detect_keywords: ["토스뱅크", "토스", "Toss"]
+    columns:
+      txn_at: ["거래일시", "거래일자", "일시"]
+      counterparty: ["거래상대", "받는분", "보낸분", "거래처"]
+      deposit: ["입금", "입금액"]
+      withdraw: ["출금", "출금액"]
+      balance: ["잔액", "거래후잔액"]
+      memo: ["메모", "적요", "거래내용"]
+
+  generic:
+    display_name: 기타 (수동 매핑)
+    auto_detect_keywords: []
+    columns:
+      txn_at: ["거래일시", "거래일자", "일시", "거래일", "Date"]
+      counterparty: ["거래처", "상대방", "받는분/보낸분", "Counterparty"]
+      deposit: ["입금", "입금액", "Deposit"]
+      withdraw: ["출금", "출금액", "Withdraw"]
+      balance: ["잔액", "거래후잔액", "Balance"]
+      memo: ["적요", "메모", "내용", "Memo"]
