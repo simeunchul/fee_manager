@@ -128,10 +128,15 @@ def download_update(
     info: UpdateInfo,
     dest_dir: Optional[Path] = None,
     max_attempts: int = 3,
+    progress_cb=None,
 ) -> Path:
     """새 zip 을 다운로드하고 ``.pending_update`` 마커를 만든다.
 
-    SSL/네트워크 일시 오류(예: 백신 SSL inspection, MAC 검증 실패) 시 자동 재시도.
+    Args:
+        progress_cb: callable(downloaded_bytes, total_bytes) -> None.
+            UI 가 있으면 진행률 표시용 콜백. ``total_bytes`` 가 알 수 없으면 0.
+        max_attempts: SSL/네트워크 일시 오류 시 자동 재시도 횟수.
+
     반환값: 다운로드된 zip 의 경로.
     """
     dest_dir = dest_dir or Path(os.environ.get("TEMP", str(PROJECT_ROOT)))
@@ -147,12 +152,18 @@ def download_update(
                 headers={"User-Agent": "fee-manager"},
             )
             with urllib.request.urlopen(req, timeout=60) as resp, open(tmp_path, "wb") as f:
+                total = int(resp.headers.get("Content-Length") or 0)
+                downloaded = 0
+                if progress_cb:
+                    progress_cb(0, total)
                 while True:
                     chunk = resp.read(64 * 1024)
                     if not chunk:
                         break
                     f.write(chunk)
-            # 부분 파일이 있으면 정리 후 최종 이름으로 rename
+                    downloaded += len(chunk)
+                    if progress_cb:
+                        progress_cb(downloaded, total)
             if zip_path.exists():
                 try:
                     zip_path.unlink()
@@ -172,9 +183,9 @@ def download_update(
                 continue
             raise RuntimeError(
                 f"다운로드 실패 ({attempt}회 시도): {e}\n\n"
-                f"백신/보안 프로그램이 HTTPS 트래픽을 검사 중일 수 있습니다. "
-                f"잠시 후 다시 시도하거나 GitHub Releases 페이지에서 zip 을 직접 받아 "
-                f"install.bat 으로 재설치해주세요."
+                f"백신/보안 프로그램(예: AhnLab Safe Transaction) 이 HTTPS 트래픽을 검사 중일 수 있습니다.\n"
+                f"잠시 후 다시 시도하거나, GitHub Releases 페이지({info.download_url})에서 "
+                f"zip 을 브라우저로 직접 받아 install.bat 으로 재설치해주세요."
             ) from last_err
 
     PENDING_MARKER.write_text(

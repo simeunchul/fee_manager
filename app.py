@@ -25,35 +25,63 @@ def _storage():
 
 
 @st.cache_data(ttl=3600)
-def _check_update_cached():
-    return updater.check_for_update()
+def _check_update_cached(_nonce: int = 0):
+    """앱 시작 시 1시간 캐시. 강제 재확인 시 _nonce 를 바꿔 캐시 우회."""
+    return updater.check_for_update(force=(_nonce > 0))
 
 
 def _render_update_banner():
-    info = _check_update_cached()
-    if not info or not info.is_newer:
-        return
+    nonce = st.session_state.get("_update_check_nonce", 0)
+    info = _check_update_cached(nonce)
     with st.sidebar:
-        st.warning(
-            f"새 버전 **{info.latest}** 이 있습니다.\n\n현재: {info.current}",
-            icon="⬆️",
-        )
-        if info.notes:
-            with st.sidebar.expander("변경사항"):
-                st.markdown(info.notes)
-        if st.button("업데이트 받기", use_container_width=True, key="_update_btn"):
-            with st.spinner("새 버전 다운로드 중..."):
-                try:
-                    updater.download_update(info)
-                except Exception as e:
-                    st.error(f"다운로드 실패: {e}")
-                    return
-            st.success(
-                "✅ 다운로드 완료. 잠시 후 자동으로 재시작됩니다.\n\n"
-                "재시작 후엔 **브라우저를 새로고침** 해주세요."
+        if info and info.is_newer:
+            st.warning(
+                f"새 버전 **{info.latest}** 이 있습니다.\n\n현재: {info.current}",
+                icon="⬆️",
             )
-            updater.schedule_self_terminate(delay_sec=3.0)
-            st.stop()
+            if info.notes:
+                with st.sidebar.expander("변경사항"):
+                    st.markdown(info.notes)
+            if st.button("업데이트 받기", use_container_width=True, key="_update_btn"):
+                progress_bar = st.progress(0, text="다운로드 준비 중...")
+
+                def _on_progress(downloaded: int, total: int):
+                    if total > 0:
+                        pct = min(downloaded / total, 1.0)
+                        mb_done = downloaded / (1024 * 1024)
+                        mb_total = total / (1024 * 1024)
+                        progress_bar.progress(
+                            pct,
+                            text=f"다운로드 중... {mb_done:.1f} / {mb_total:.1f} MB ({int(pct*100)}%)",
+                        )
+                    else:
+                        mb_done = downloaded / (1024 * 1024)
+                        progress_bar.progress(
+                            0,
+                            text=f"다운로드 중... {mb_done:.1f} MB",
+                        )
+
+                try:
+                    updater.download_update(info, progress_cb=_on_progress)
+                except Exception as e:
+                    progress_bar.empty()
+                    st.error(f"다운로드 실패:\n\n{e}")
+                    st.markdown(
+                        f"[GitHub Releases 페이지에서 직접 받기]({info.download_url})"
+                    )
+                    return
+                progress_bar.progress(1.0, text="다운로드 완료")
+                st.success(
+                    "✅ 다운로드 완료. 잠시 후 자동으로 재시작됩니다.\n\n"
+                    "재시작 후엔 **브라우저를 새로고침** 해주세요."
+                )
+                updater.schedule_self_terminate(delay_sec=3.0)
+                st.stop()
+        # 강제 재확인 버튼 — 새 release 직후 캐시 우회용
+        if st.button("↻ 업데이트 다시 확인", use_container_width=True, key="_force_check_btn"):
+            st.session_state["_update_check_nonce"] = nonce + 1
+            st.cache_data.clear()
+            st.rerun()
 
 
 def main():
