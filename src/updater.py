@@ -124,25 +124,58 @@ def check_for_update(force: bool = False) -> Optional[UpdateInfo]:
     return UpdateInfo(current=cur, latest=tag, download_url=asset_url, notes=notes)
 
 
-def download_update(info: UpdateInfo, dest_dir: Optional[Path] = None) -> Path:
+def download_update(
+    info: UpdateInfo,
+    dest_dir: Optional[Path] = None,
+    max_attempts: int = 3,
+) -> Path:
     """새 zip 을 다운로드하고 ``.pending_update`` 마커를 만든다.
 
+    SSL/네트워크 일시 오류(예: 백신 SSL inspection, MAC 검증 실패) 시 자동 재시도.
     반환값: 다운로드된 zip 의 경로.
     """
     dest_dir = dest_dir or Path(os.environ.get("TEMP", str(PROJECT_ROOT)))
     dest_dir.mkdir(parents=True, exist_ok=True)
     zip_path = dest_dir / f"fee_manager_portable_{info.latest}.zip"
+    tmp_path = zip_path.with_suffix(zip_path.suffix + ".part")
 
-    req = urllib.request.Request(
-        info.download_url,
-        headers={"User-Agent": "fee-manager"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp, open(zip_path, "wb") as f:
-        while True:
-            chunk = resp.read(64 * 1024)
-            if not chunk:
-                break
-            f.write(chunk)
+    last_err: Optional[Exception] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            req = urllib.request.Request(
+                info.download_url,
+                headers={"User-Agent": "fee-manager"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp, open(tmp_path, "wb") as f:
+                while True:
+                    chunk = resp.read(64 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            # 부분 파일이 있으면 정리 후 최종 이름으로 rename
+            if zip_path.exists():
+                try:
+                    zip_path.unlink()
+                except Exception:
+                    pass
+            tmp_path.replace(zip_path)
+            break
+        except Exception as e:
+            last_err = e
+            try:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+            except Exception:
+                pass
+            if attempt < max_attempts:
+                time.sleep(1.5 * attempt)
+                continue
+            raise RuntimeError(
+                f"다운로드 실패 ({attempt}회 시도): {e}\n\n"
+                f"백신/보안 프로그램이 HTTPS 트래픽을 검사 중일 수 있습니다. "
+                f"잠시 후 다시 시도하거나 GitHub Releases 페이지에서 zip 을 직접 받아 "
+                f"install.bat 으로 재설치해주세요."
+            ) from last_err
 
     PENDING_MARKER.write_text(
         json.dumps({
