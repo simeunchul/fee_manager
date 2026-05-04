@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-from src import reporter
+from src import reporter, pipeline
 from src.storage import get_storage
 
 
@@ -14,7 +14,7 @@ st.title("비용관리")
 
 storage = get_storage("local")
 settings = storage.get_settings()
-txs = storage.list_transactions()
+txs = pipeline.load_classified_transactions(storage)
 
 expense_txs = [t for t in txs if t.kind == "비용"]
 if not expense_txs:

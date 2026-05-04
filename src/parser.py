@@ -32,18 +32,31 @@ def list_supported_banks() -> list[tuple[str, str]]:
 
 
 def detect_bank(file_path: str | Path) -> Optional[str]:
-    """파일 첫 몇 줄을 읽어 은행을 추정. 못 찾으면 None."""
+    """파일 헤더 영역을 읽어 은행을 추정. 못 찾으면 None.
+
+    거래 데이터에 다른 은행명(예: "신한카드" 같은 상대방)이 들어가서
+    오탐되는 걸 막기 위해 (1) 첫 5행만 보고 (2) 점수제로 가장 많이
+    매칭된 은행을 선택한다.
+    """
     cfg = load_bank_config()
     try:
-        df = _read_excel_raw(file_path, header=None, nrows=15)
+        df = _read_excel_raw(file_path, header=None, nrows=10)
     except Exception:
         return None
-    blob = " ".join(df.astype(str).fillna("").to_numpy().ravel().tolist())
+    head = df.head(5)
+    blob = " ".join(head.astype(str).fillna("").to_numpy().ravel().tolist())
+
+    best_bank, best_score = None, 0
     for bank_key, bank_cfg in cfg.items():
-        for kw in bank_cfg.get("auto_detect_keywords", []) or []:
-            if kw and kw in blob:
-                return bank_key
-    return None
+        if bank_key == "generic":
+            continue
+        score = sum(
+            1 for kw in (bank_cfg.get("auto_detect_keywords") or [])
+            if kw and kw in blob
+        )
+        if score > best_score:
+            best_bank, best_score = bank_key, score
+    return best_bank
 
 
 def parse_bank_file(

@@ -9,7 +9,7 @@ import pandas as pd
 import altair as alt
 
 from src.storage import get_storage
-from src import reporter
+from src import reporter, updater, pipeline
 
 
 st.set_page_config(
@@ -20,32 +20,51 @@ st.set_page_config(
 
 
 @st.cache_resource
-def _storage(backend: str):
-    return get_storage(backend)
+def _storage():
+    return get_storage("local")
 
 
-def _get_storage_safely():
-    """설정에서 backend 를 읽되, sheets 가 인증 안 됐으면 local 로 폴백."""
-    local = _storage("local")
-    settings = local.get_settings()
-    if settings.storage_backend == "google_sheets":
-        try:
-            return _storage("google_sheets"), settings
-        except Exception:
-            st.warning(
-                "구글 시트 백엔드가 설정되어 있지만 인증이 완료되지 않아 "
-                "로컬 저장소로 동작 중입니다. (설정 페이지에서 변경 가능)"
+@st.cache_data(ttl=3600)
+def _check_update_cached():
+    return updater.check_for_update()
+
+
+def _render_update_banner():
+    info = _check_update_cached()
+    if not info or not info.is_newer:
+        return
+    with st.sidebar:
+        st.warning(
+            f"새 버전 **{info.latest}** 이 있습니다.\n\n현재: {info.current}",
+            icon="⬆️",
+        )
+        if info.notes:
+            with st.sidebar.expander("변경사항"):
+                st.markdown(info.notes)
+        if st.button("업데이트 받기", use_container_width=True, key="_update_btn"):
+            with st.spinner("새 버전 다운로드 중..."):
+                try:
+                    updater.download_update(info)
+                except Exception as e:
+                    st.error(f"다운로드 실패: {e}")
+                    return
+            st.success(
+                "✅ 다운로드 완료. 잠시 후 자동으로 재시작됩니다.\n\n"
+                "재시작 후엔 **브라우저를 새로고침** 해주세요."
             )
-    return local, settings
+            updater.schedule_self_terminate(delay_sec=3.0)
+            st.stop()
 
 
 def main():
     st.title("회비관리")
     st.caption("팀/모임 회비 입금·출금을 자동 매칭하고 미납자를 추적합니다.")
+    _render_update_banner()
 
-    storage, settings = _get_storage_safely()
+    storage = _storage()
+    settings = storage.get_settings()
     members = storage.list_members()
-    txs = storage.list_transactions()
+    txs = pipeline.load_classified_transactions(storage)
 
     this_month = reporter.current_month_key()
     st.subheader(f"이번 달 ({this_month}) 요약")
@@ -60,6 +79,22 @@ def main():
     col2.metric("이번 달 납부", f"{len(active) - len(unpaid)} / {len(active)}명")
     col3.metric("회비 수입", f"{fee_in:,}원")
     col4.metric("비용 지출", f"{out:,}원")
+
+    st.subheader("누적 요약")
+    total_fee = sum(t.deposit for t in txs if t.kind == "회비")
+    total_other = sum(t.deposit for t in txs if t.kind == "기타입금")
+    total_out = sum(t.withdraw for t in txs if t.kind == "비용")
+    balance = total_fee + total_other - total_out
+
+    a1, a2, a3, a4 = st.columns(4)
+    a1.metric("누적 회비수입", f"{total_fee:,}원")
+    a2.metric("누적 기타입금", f"{total_other:,}원")
+    a3.metric("누적 비용지출", f"{total_out:,}원")
+    a4.metric(
+        "잔여금액",
+        f"{balance:,}원",
+        help="누적 회비수입 + 누적 기타입금 - 누적 비용지출. 거래내역에 기록된 범위 기준이라 시작 시점 이전 잔고는 반영되지 않습니다.",
+    )
 
     st.divider()
 
@@ -121,8 +156,8 @@ def main():
                 "구분": t.kind,
                 "상대방": t.counterparty,
                 "회원매칭": t.matched_member,
-                "입금": t.deposit if t.deposit else "",
-                "출금": t.withdraw if t.withdraw else "",
+                "입금": f"{t.deposit:,}" if t.deposit else "",
+                "출금": f"{t.withdraw:,}" if t.withdraw else "",
                 "카테고리": t.category,
                 "적요": t.memo,
             } for t in recent]),
@@ -140,8 +175,9 @@ def main():
                **거래내역 업로드** 페이지에 끌어다 놓으세요.
             4. **월별 납부현황** 에서 누가 안 냈는지, **비용관리** 에서 지출 내역을 확인할 수 있습니다.
 
-            > 데이터는 모두 본 컴퓨터의 `data/` 폴더에 저장됩니다 (CSV 파일).
-            > 구글 시트와 연동하려면 OAuth 설정 후 **설정** 페이지에서 백엔드를 변경하세요.
+            > 데이터는 본 컴퓨터의 `%USERPROFILE%\\.fee_manager\\` 폴더에 저장됩니다 (CSV 파일).
+            > 앱을 업데이트(폴더 교체)해도 데이터는 보존됩니다.
+            > 팀원과 공유는 **월별 납부현황 → 엑셀 다운로드** 로 한 번에.
             """
         )
 

@@ -1,0 +1,13 @@
+{
+  "monthly_fee": 50000,
+  "fee_due_day": 10,
+  "expense_categories": [
+    "식대",
+    "임대료",
+    "소모품",
+    "회식",
+    "기타"
+  ],
+  "storage_backend": "local",
+  "spreadsheet_id": ""
+}

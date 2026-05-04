@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from src import matcher, parser
+from src import matcher, parser, pipeline
 from src.storage import get_storage
 
 
@@ -91,20 +91,30 @@ if uploaded:
             "구분": t.kind,
             "상대방": t.counterparty,
             "회원매칭": t.matched_member,
-            "입금": t.deposit if t.deposit else "",
-            "출금": t.withdraw if t.withdraw else "",
+            "입금": f"{t.deposit:,}" if t.deposit else "",
+            "출금": f"{t.withdraw:,}" if t.withdraw else "",
             "카테고리": t.category,
             "적요": t.memo,
         } for t in sorted(all_new_txs, key=lambda x: x.txn_at)])
 
         st.dataframe(preview_df, use_container_width=True, hide_index=True, height=400)
 
-        unmatched = [t for t in all_new_txs if t.kind == "기타입금"]
+        deposits = [t for t in all_new_txs if t.is_deposit]
+        unmatched = [t for t in deposits if not t.matched_member]
+        odd_amount = [t for t in deposits if t.matched_member and t.kind == "기타입금"]
+
         if unmatched:
             st.warning(
-                f"매칭되지 않은 입금이 {len(unmatched)}건 있습니다. "
+                f"회원과 연결되지 않은 입금이 {len(unmatched)}건 있습니다. "
                 "회원명단에 없는 사람이거나 이름이 다르게 송금된 경우입니다. "
                 "저장 후 회원관리에서 이름을 추가/수정하고 다시 업로드하면 자동으로 갱신됩니다."
+            )
+        if odd_amount:
+            names = ", ".join(sorted({t.matched_member for t in odd_amount}))
+            st.info(
+                f"회원은 매칭됐지만 회비 금액과 달라 **기타입금**으로 분류된 건이 "
+                f"{len(odd_amount)}건 있습니다 ({names}). "
+                "부분납·잡수입이면 그대로 두고, 회비가 맞다면 **설정** 페이지에서 회비액을 조정하세요."
             )
 
         col1, col2 = st.columns([1, 5])
@@ -117,11 +127,15 @@ if uploaded:
 
 st.divider()
 
-with st.expander("저장된 거래내역 전체 보기 / 재분류"):
-    existing = storage.list_transactions()
+with st.expander("저장된 거래내역 전체 보기 / 수정 / 삭제"):
+    existing = pipeline.load_classified_transactions(storage)
     st.write(f"현재 저장된 거래 수: **{len(existing)}건**")
     if existing:
+        existing = sorted(existing, key=lambda t: t.txn_at, reverse=True)
+        member_options = [""] + [m.name for m in members if m.active]
+
         df = pd.DataFrame([{
+            "삭제": False,
             "일시": t.txn_at.strftime("%Y-%m-%d %H:%M"),
             "구분": t.kind,
             "상대방": t.counterparty,
@@ -131,10 +145,52 @@ with st.expander("저장된 거래내역 전체 보기 / 재분류"):
             "카테고리": t.category,
             "적요": t.memo,
         } for t in existing])
-        st.dataframe(df, use_container_width=True, hide_index=True, height=300)
 
-        if st.button("회원명단으로 전체 재분류", help="회원 추가/수정 후 누르면 기존 거래도 매칭이 갱신됩니다."):
-            reclassified = matcher.classify(existing, members, settings)
-            storage.replace_transactions(reclassified)
-            st.success("전체 거래를 재분류했습니다.")
+        st.caption(
+            "✏️ 회원매칭을 직접 변경하고 **변경사항 저장** 누르면 됩니다. "
+            "직접 변경한 매칭은 다음 자동 재분류에서 보호되고, "
+            "다시 자동 매칭으로 돌리려면 회원매칭을 빈 값으로 비우고 저장하세요."
+        )
+
+        edited = st.data_editor(
+            df,
+            column_config={
+                "삭제": st.column_config.CheckboxColumn(help="체크 후 저장 시 삭제"),
+                "회원매칭": st.column_config.SelectboxColumn(
+                    options=member_options,
+                    help="자동매칭이 틀렸으면 직접 지정. 빈 값은 자동매칭으로 복귀.",
+                ),
+            },
+            disabled=["일시", "구분", "상대방", "입금", "출금", "카테고리", "적요"],
+            use_container_width=True,
+            hide_index=True,
+            height=400,
+            num_rows="fixed",
+            key="tx_editor",
+        )
+
+        b1, b2 = st.columns([1, 5])
+        if b1.button("변경사항 저장", type="primary", key="_save_tx_edit"):
+            survivors: list = []
+            n_deleted = 0
+            n_changed = 0
+            for i, t in enumerate(existing):
+                row = edited.iloc[i]
+                if bool(row["삭제"]):
+                    n_deleted += 1
+                    continue
+                new_match = str(row["회원매칭"] or "").strip()
+                if new_match != (t.matched_member or ""):
+                    t.matched_member = new_match
+                    t.manual_match = bool(new_match)
+                    n_changed += 1
+                survivors.append(t)
+            storage.replace_transactions(survivors)
+            msg_parts = []
+            if n_deleted:
+                msg_parts.append(f"{n_deleted}건 삭제")
+            if n_changed:
+                msg_parts.append(f"{n_changed}건 매칭 변경")
+            msg = "✅ 변경사항 저장 완료" + (f" ({', '.join(msg_parts)})" if msg_parts else "")
+            st.toast(msg, icon="✅")
             st.rerun()

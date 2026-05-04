@@ -15,7 +15,7 @@
 banks:
   kb:
     display_name: KB국민
-    auto_detect_keywords: ["KB국민", "국민은행", "KB Star"]
+    auto_detect_keywords: ["KB국민", "국민은행", "KB Star", "KB스타", "Kookmin", "KB Bank", "KB은행"]
     columns:
       txn_at: ["거래일시", "거래일자", "일시", "거래일", "거래시각"]
       counterparty: ["보낸분/받는분", "거래처", "받는분/보낸분", "상대계좌예금주", "거래상대"]
@@ -26,7 +26,7 @@ banks:
 
   shinhan:
     display_name: 신한
-    auto_detect_keywords: ["신한", "Shinhan"]
+    auto_detect_keywords: ["신한은행", "Shinhan Bank", "신한 SOL", "신한쏠"]
     columns:
       txn_at: ["거래일시", "거래일자", "일시", "거래일"]
       counterparty: ["거래내용", "받는분/보낸분", "상대방", "거래처"]
@@ -37,7 +37,7 @@ banks:
 
   woori:
     display_name: 우리
-    auto_detect_keywords: ["우리은행", "WOORI"]
+    auto_detect_keywords: ["우리은행", "WOORI BANK", "Woori Bank"]
     columns:
       txn_at: ["거래일시", "거래일자", "거래일"]
       counterparty: ["거래처", "받는분/보낸분", "상대"]
@@ -48,7 +48,7 @@ banks:
 
   hana:
     display_name: 하나
-    auto_detect_keywords: ["하나은행", "KEB", "Hana"]
+    auto_detect_keywords: ["하나은행", "KEB하나", "Hana Bank"]
     columns:
       txn_at: ["거래일시", "거래일자", "거래일", "일시"]
       counterparty: ["거래처", "받는분/보낸분", "상대"]
@@ -59,7 +59,7 @@ banks:
 
   nh:
     display_name: 농협
-    auto_detect_keywords: ["농협", "NH"]
+    auto_detect_keywords: ["농협은행", "NH농협", "NH Bank", "Nonghyup"]
     columns:
       txn_at: ["거래일자", "거래일시", "거래일"]
       counterparty: ["거래기록사항", "받는분/보낸분", "상대"]
@@ -70,7 +70,7 @@ banks:
 
   kakaobank:
     display_name: 카카오뱅크
-    auto_detect_keywords: ["카카오뱅크", "Kakao Bank"]
+    auto_detect_keywords: ["카카오뱅크", "Kakao Bank", "KakaoBank"]
     columns:
       txn_at: ["거래일시", "거래일자"]
       counterparty: ["거래상대", "받는분/보낸분", "보낸사람"]
@@ -81,7 +81,7 @@ banks:
 
   toss:
     display_name: 토스뱅크
-    auto_detect_keywords: ["토스뱅크", "토스", "Toss"]
+    auto_detect_keywords: ["토스뱅크", "Toss Bank", "TossBank"]
     columns:
       txn_at: ["거래일시", "거래일자", "일시"]
       counterparty: ["거래상대", "받는분", "보낸분", "거래처"]

@@ -32,7 +32,11 @@ def classify(
     members: list[Member],
     settings: Settings,
 ) -> list[Transaction]:
-    """거래 리스트를 받아 kind/matched_member/category 를 채운 새 리스트 반환."""
+    """거래 리스트를 받아 kind/matched_member/category 를 채운 새 리스트 반환.
+
+    ``manual_match=True`` 인 거래는 ``matched_member`` 를 사용자가 지정한 값으로
+    유지하고, ``kind`` 만 회비액 기준으로 다시 계산한다.
+    """
     member_index = _build_member_index(members)
     fee = settings.monthly_fee
     out: list[Transaction] = []
@@ -47,26 +51,35 @@ def classify(
             kind=t.kind,
             matched_member=t.matched_member,
             category=t.category,
+            manual_match=t.manual_match,
         )
         if new_t.is_withdraw:
             new_t.kind = "비용"
-            new_t.matched_member = ""
+            # 자동 분류 결과는 매칭 클리어. 사용자가 수동 매칭한 출금
+            # (예: "이 카카오페이 비용은 누가 결제") 은 그대로 보존.
+            if not new_t.manual_match:
+                new_t.matched_member = ""
             if not new_t.category:
                 new_t.category = _guess_expense_category(new_t.memo, settings.expense_categories)
             out.append(new_t)
             continue
 
         # 입금 처리
-        member = _match_member(new_t.counterparty, member_index)
+        if new_t.manual_match:
+            # 사용자가 지정한 매칭 보존. 단 그 회원이 활성 멤버인지만 가볍게 검증.
+            member = member_index.get(normalize_name(new_t.matched_member))
+        else:
+            member = _match_member(new_t.counterparty, member_index)
+
         if member is None:
             new_t.kind = "기타입금"
-            new_t.matched_member = ""
+            if not new_t.manual_match:
+                new_t.matched_member = ""
         else:
             new_t.matched_member = member.name
             if fee == 0 or new_t.deposit == fee:
                 new_t.kind = "회비"
             else:
-                # 회원이긴 하지만 금액이 다름 → 회비로 보긴 하되 "miscellaneous" 표시는 UI에서
                 new_t.kind = "회비" if abs(new_t.deposit - fee) <= max(1000, fee * 0.1) else "기타입금"
         out.append(new_t)
     return out

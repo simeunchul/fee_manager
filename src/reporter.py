@@ -1,6 +1,7 @@
 """분류된 거래내역을 집계해 리포트(미납자/수입지출/월별현황)를 만든다."""
 from __future__ import annotations
 
+import io
 from datetime import date
 from typing import Iterable
 
@@ -111,3 +112,37 @@ def member_payment_history(
 def current_month_key(today: date | None = None) -> str:
     today = today or date.today()
     return today.strftime("%Y-%m")
+
+
+def to_xlsx(sheets: dict[str, pd.DataFrame]) -> bytes:
+    """여러 DataFrame 을 한 .xlsx 의 여러 시트로 묶어 바이트로 반환.
+
+    streamlit ``st.download_button`` 의 ``data`` 인자로 그대로 전달 가능.
+    """
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        for sheet_name, df in sheets.items():
+            # Excel 시트명 길이 제한 31자
+            safe = sheet_name[:31] if len(sheet_name) > 31 else sheet_name
+            df.to_excel(w, sheet_name=safe, index=False)
+    return buf.getvalue()
+
+
+def to_csv(df: pd.DataFrame) -> bytes:
+    """엑셀 한국어 호환을 위해 BOM 포함 UTF-8 으로 직렬화."""
+    return df.to_csv(index=False).encode("utf-8-sig")
+
+
+def unpaid_report_df(
+    members: list[Member],
+    unpaid: list[Member],
+    month_key: str,
+) -> pd.DataFrame:
+    """카톡/이메일 첨부용 미납자 보고서 DataFrame."""
+    rows = [{
+        "이름": m.name,
+        "연락처": m.contact,
+        "비고": m.note,
+    } for m in unpaid]
+    df = pd.DataFrame(rows, columns=["이름", "연락처", "비고"])
+    return df

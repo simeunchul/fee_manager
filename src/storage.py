@@ -6,11 +6,9 @@ from .models import Member, Settings, Transaction
 
 
 class Storage(ABC):
-    """회원/거래/설정 데이터를 어디에 저장하든 동일한 인터페이스로 다룬다.
+    """회원/거래/설정 데이터를 일관된 인터페이스로 다룬다.
 
-    구현체:
-      - LocalStorage      : data/ 폴더에 CSV/JSON 으로 저장 (기본, 즉시 동작)
-      - GoogleSheetsStorage : 사용자의 구글 시트에 저장 (OAuth 발급 후 사용)
+    현재 구현체: ``LocalStorage`` (사용자 홈의 ``.fee_manager/`` 폴더에 CSV/JSON).
     """
 
     @abstractmethod
@@ -44,7 +42,4 @@ def get_storage(backend: str = "local"):
     if backend == "local":
         from .local_storage import LocalStorage
         return LocalStorage()
-    if backend == "google_sheets":
-        from .sheets_storage import GoogleSheetsStorage
-        return GoogleSheetsStorage()
     raise ValueError(f"알 수 없는 storage backend: {backend}")

@@ -43,6 +43,10 @@ class Transaction:
     kind: TxKind = "미분류"
     matched_member: str = ""
     category: str = ""
+    # 사용자가 회원매칭을 수동으로 변경한 거래는 자동 재매칭 대상에서 제외.
+    # (counterparty 가 정규 회원명과 안 맞아도 사용자가 "이 송금은 누구"라고
+    # 지정한 결과를 보존하기 위함.)
+    manual_match: bool = False
 
     @property
     def is_deposit(self) -> bool:
@@ -71,10 +75,14 @@ class Transaction:
             "kind": self.kind,
             "matched_member": self.matched_member,
             "category": self.category,
+            "manual_match": self.manual_match,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "Transaction":
+        manual = d.get("manual_match", False)
+        if isinstance(manual, str):
+            manual = manual.strip().lower() in ("true", "1", "yes", "y")
         return cls(
             txn_at=_parse_datetime(d["txn_at"]),
             counterparty=str(d.get("counterparty", "")),
@@ -85,6 +93,7 @@ class Transaction:
             kind=str(d.get("kind", "미분류")),  # type: ignore[arg-type]
             matched_member=str(d.get("matched_member", "")),
             category=str(d.get("category", "")),
+            manual_match=bool(manual),
         )
 
 
@@ -95,8 +104,6 @@ class Settings:
     expense_categories: list[str] = field(
         default_factory=lambda: ["식대", "임대료", "소모품", "회식", "기타"]
     )
-    storage_backend: Literal["local", "google_sheets"] = "local"
-    spreadsheet_id: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -108,8 +115,6 @@ class Settings:
             fee_due_day=int(d.get("fee_due_day", 10)),
             expense_categories=list(d.get("expense_categories")
                                     or ["식대", "임대료", "소모품", "회식", "기타"]),
-            storage_backend=str(d.get("storage_backend", "local")),  # type: ignore[arg-type]
-            spreadsheet_id=str(d.get("spreadsheet_id", "")),
         )
 
 

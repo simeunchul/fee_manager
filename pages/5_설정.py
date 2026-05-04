@@ -1,14 +1,19 @@
-"""회비액, 마감일, 비용 카테고리, 저장소 백엔드 설정."""
+"""회비액, 마감일, 비용 카테고리 설정."""
 from __future__ import annotations
 
 import streamlit as st
 
+from src import pipeline
 from src.models import Settings
 from src.storage import get_storage
 
 
 st.set_page_config(page_title="설정", page_icon="⚙️", layout="centered")
 st.title("설정")
+
+# rerun 직후 사용자가 저장 결과를 명확히 볼 수 있도록 상단에 메시지 노출
+if _saved_msg := st.session_state.pop("_settings_saved_msg", None):
+    st.success(_saved_msg)
 
 storage = get_storage("local")
 settings = storage.get_settings()
@@ -39,39 +44,21 @@ new_categories = [
     if c.strip()
 ]
 
-st.subheader("저장소 백엔드")
-backend = st.radio(
-    "데이터 저장 위치",
-    options=["local", "google_sheets"],
-    format_func=lambda x: {"local": "로컬 (data/ 폴더 CSV)", "google_sheets": "구글 스프레드시트"}[x],
-    index=0 if settings.storage_backend == "local" else 1,
-    horizontal=True,
-)
-
-spreadsheet_id = ""
-if backend == "google_sheets":
-    spreadsheet_id = st.text_input(
-        "스프레드시트 ID",
-        value=settings.spreadsheet_id,
-        help="구글 시트 URL 의 /d/ 다음 부분 (예: 1AbCdEf...)",
-    )
-    st.warning(
-        "구글 시트 백엔드를 사용하려면 OAuth 인증이 필요합니다. "
-        "현재 인증 코드가 비활성화되어 있으니 `credentials/SETUP_OAUTH.md` 가이드에 따라 "
-        "발급한 뒤 `src/auth.py` 의 `get_gspread_client()` 를 활성화하세요."
-    )
-
 if st.button("저장", type="primary"):
     new_settings = Settings(
         monthly_fee=int(fee),
         fee_due_day=int(due_day),
         expense_categories=new_categories or ["기타"],
-        storage_backend=backend,  # type: ignore[arg-type]
-        spreadsheet_id=spreadsheet_id.strip(),
     )
     storage.save_settings(new_settings)
-    st.success("설정이 저장되었습니다.")
+    changed = pipeline.reclassify_and_save(storage)
+    msg = "✅ 설정이 저장되었습니다."
+    if changed:
+        msg += f" 회비액 변경에 따라 거래 {changed}건의 분류를 자동 갱신했습니다."
+    st.toast(msg, icon="✅")
+    st.session_state["_settings_saved_msg"] = msg
     st.cache_resource.clear()
+    st.cache_data.clear()
     st.rerun()
 
 st.divider()

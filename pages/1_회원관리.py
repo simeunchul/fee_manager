@@ -6,6 +6,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
+from src import pipeline
 from src.models import Member
 from src.storage import get_storage
 
@@ -13,8 +14,21 @@ from src.storage import get_storage
 st.set_page_config(page_title="회원관리", page_icon="👥", layout="wide")
 st.title("회원관리")
 
+if _saved_msg := st.session_state.pop("_members_saved_msg", None):
+    st.success(_saved_msg)
+
 storage = get_storage("local")
 members = storage.list_members()
+
+
+def _flash_and_rerun(msg: str) -> None:
+    """변경 후 거래내역 재분류 + 토스트 + 다음 렌더에 노출할 메시지 저장."""
+    changed = pipeline.reclassify_and_save(storage)
+    if changed:
+        msg += f" 거래 {changed}건의 분류가 자동 갱신됐습니다."
+    st.toast(msg, icon="✅")
+    st.session_state["_members_saved_msg"] = msg
+    st.rerun()
 
 st.subheader("회원 추가")
 
@@ -38,8 +52,7 @@ with st.form("add_member", clear_on_submit=True):
                 contact=contact.strip(),
                 note=note.strip(),
             ))
-            st.success(f"'{name}' 회원이 추가되었습니다.")
-            st.rerun()
+            _flash_and_rerun(f"✅ '{name}' 회원이 추가되었습니다.")
 
 st.divider()
 
@@ -79,8 +92,7 @@ else:
                 contact=str(row["연락처"] or ""),
                 note=str(row["비고"] or ""),
             ))
-        st.success("저장되었습니다.")
-        st.rerun()
+        _flash_and_rerun("✅ 회원 변경사항이 저장되었습니다.")
 
     with cdel.expander("회원 삭제"):
         names = [m.name for m in members]
@@ -88,8 +100,7 @@ else:
         confirm = st.checkbox("정말 삭제합니다 (되돌릴 수 없음)")
         if st.button("삭제 실행", disabled=not (target and confirm)):
             storage.delete_member(target)
-            st.success(f"'{target}' 회원이 삭제되었습니다.")
-            st.rerun()
+            _flash_and_rerun(f"✅ '{target}' 회원이 삭제되었습니다.")
 
 st.divider()
 with st.expander("CSV 일괄 업로드 (대량 등록 시)"):
@@ -102,7 +113,6 @@ with st.expander("CSV 일괄 업로드 (대량 등록 시)"):
             for _, row in new_df.iterrows():
                 storage.upsert_member(Member.from_dict(row.to_dict()))
                 count += 1
-            st.success(f"{count}명을 추가/갱신했습니다.")
-            st.rerun()
+            _flash_and_rerun(f"✅ {count}명을 추가/갱신했습니다.")
         except Exception as e:
             st.error(f"파일 읽기 실패: {e}")

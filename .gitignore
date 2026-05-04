@@ -33,3 +33,12 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Portable build artifacts (build_portable.ps1 가 생성)
+_runtime/
+.build_cache/
+dist/
+
+# Auto-update runtime state
+.pending_update
+.update_check_cache.json

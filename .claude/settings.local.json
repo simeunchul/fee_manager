@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(powershell -ExecutionPolicy Bypass -File build_portable.ps1 2>&1)",
+      "PowerShell($tmp = Join-Path $env:TEMP \"fm_smoketest_$\\(Get-Random\\)\"; New-Item -ItemType Directory -Force -Path $tmp | Out-Null; Expand-Archive -Path \"D:\\\\simeunchul\\\\fee_manager\\\\dist\\\\fee_manager_portable_1.0.0.zip\" -DestinationPath $tmp -Force; Get-ChildItem $tmp; Write-Host \"---\"; Get-ChildItem \\(Get-ChildItem $tmp -Directory | Select-Object -First 1\\).FullName | Select-Object Name; Write-Host \"EXTRACT_DIR=$tmp\")"
+    ]
+  }
+}
