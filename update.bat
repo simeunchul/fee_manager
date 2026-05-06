@@ -6,7 +6,7 @@ if not exist "%PY%" set "PY=python"
 
 rem 보류 zip 경로 가져오기 + 마커 삭제
 set "ZIP_PATH="
-for /f "usebackq delims=" %%i in (`"%PY%" -m src.updater pending-zip 2>nul`) do set "ZIP_PATH=%%i"
+for /f "usebackq delims=" %%i in (`"%PY%" -m src.updater pending-zip 2^>nul`) do set "ZIP_PATH=%%i"
 
 if not defined ZIP_PATH (
     echo 보류 업데이트 정보가 없습니다.
@@ -26,7 +26,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-rem zip 안에 fee_manager_X.Y.Z\ 폴더가 들어있다고 가정 - 첫 폴더를 소스로 사용
+rem zip 안엔 fee_manager_X.Y.Z\ 폴더가 들어있다고 가정 - 첫 폴더를 소스로 사용
 set "SRC_DIR="
 for /d %%d in ("%TMPDIR%\*") do (
     if not defined SRC_DIR set "SRC_DIR=%%d"
@@ -38,7 +38,6 @@ if not defined SRC_DIR (
 )
 
 rem robocopy: 현재 폴더로 동기화. run.bat / update.bat 은 자기 자신이라 잠금 가능 - 제외.
-rem __pycache__, .git 같은 것도 제외.
 robocopy "%SRC_DIR%" "%~dp0" /E /R:1 /W:1 /XF run.bat update.bat /XD __pycache__ .git .venv >nul
 set "RC=%ERRORLEVEL%"
 

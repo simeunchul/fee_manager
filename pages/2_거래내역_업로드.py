@@ -127,7 +127,7 @@ if uploaded:
 
 st.divider()
 
-with st.expander("저장된 거래내역 전체 보기 / 수정 / 삭제"):
+with st.expander("저장된 거래내역 전체 보기 / 회원매칭 수정"):
     existing = pipeline.load_classified_transactions(storage)
     st.write(f"현재 저장된 거래 수: **{len(existing)}건**")
     if existing:
@@ -135,7 +135,6 @@ with st.expander("저장된 거래내역 전체 보기 / 수정 / 삭제"):
         member_options = [""] + [m.name for m in members if m.active]
 
         df = pd.DataFrame([{
-            "삭제": False,
             "일시": t.txn_at.strftime("%Y-%m-%d %H:%M"),
             "구분": t.kind,
             "상대방": t.counterparty,
@@ -147,15 +146,14 @@ with st.expander("저장된 거래내역 전체 보기 / 수정 / 삭제"):
         } for t in existing])
 
         st.caption(
-            "✏️ 회원매칭을 직접 변경하고 **변경사항 저장** 누르면 됩니다. "
-            "직접 변경한 매칭은 다음 자동 재분류에서 보호되고, "
-            "다시 자동 매칭으로 돌리려면 회원매칭을 빈 값으로 비우고 저장하세요."
+            "✏️ 회원매칭만 직접 변경 가능합니다 (회계 투명성 위해 거래 삭제는 의도적으로 막아둠). "
+            "직접 변경한 매칭은 다음 자동 재분류에서 보호되며, "
+            "자동 매칭으로 되돌리려면 회원매칭을 빈 값으로 비우고 저장하세요."
         )
 
         edited = st.data_editor(
             df,
             column_config={
-                "삭제": st.column_config.CheckboxColumn(help="체크 후 저장 시 삭제"),
                 "회원매칭": st.column_config.SelectboxColumn(
                     options=member_options,
                     help="자동매칭이 틀렸으면 직접 지정. 빈 값은 자동매칭으로 복귀.",
@@ -169,28 +167,20 @@ with st.expander("저장된 거래내역 전체 보기 / 수정 / 삭제"):
             key="tx_editor",
         )
 
-        b1, b2 = st.columns([1, 5])
-        if b1.button("변경사항 저장", type="primary", key="_save_tx_edit"):
-            survivors: list = []
-            n_deleted = 0
+        if st.button("매칭 변경사항 저장", type="primary", key="_save_tx_edit"):
             n_changed = 0
             for i, t in enumerate(existing):
                 row = edited.iloc[i]
-                if bool(row["삭제"]):
-                    n_deleted += 1
-                    continue
                 new_match = str(row["회원매칭"] or "").strip()
                 if new_match != (t.matched_member or ""):
                     t.matched_member = new_match
                     t.manual_match = bool(new_match)
                     n_changed += 1
-                survivors.append(t)
-            storage.replace_transactions(survivors)
-            msg_parts = []
-            if n_deleted:
-                msg_parts.append(f"{n_deleted}건 삭제")
-            if n_changed:
-                msg_parts.append(f"{n_changed}건 매칭 변경")
-            msg = "✅ 변경사항 저장 완료" + (f" ({', '.join(msg_parts)})" if msg_parts else "")
+            storage.replace_transactions(existing)
+            msg = (
+                f"✅ {n_changed}건 매칭 변경 저장 완료"
+                if n_changed
+                else "변경된 매칭이 없습니다."
+            )
             st.toast(msg, icon="✅")
             st.rerun()
