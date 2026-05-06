@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 
@@ -30,7 +30,7 @@ echo.
 if exist "%DEST%" (
     echo 이미 설치된 폴더가 있습니다: %DEST%
     set /p answer="기존 설치를 덮어쓸까요? (y/n): "
-    if /i not "%answer%"=="y" (
+    if /i not "!answer!"=="y" (
         echo 설치를 취소했습니다.
         pause
         exit /b 0
